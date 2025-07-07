@@ -153,7 +153,7 @@ void setup() {
 
     Serial.printf("[after-task-create] Free heap: %u\n", ESP.getFreeHeap());
     //httpServer.begin(WIFI_SSID, WIFI_PASSWORD, WIFI_CHANNEL);
-    wsServer.begin(WIFI_SSID, WIFI_PASSWORD, WIFI_CHANNEL, false);
+    wsServer.begin(WIFI_SSID, WIFI_PASSWORD, WIFI_CHANNEL, true);
 }
 
 void loop() {
