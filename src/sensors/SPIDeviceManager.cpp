@@ -5,6 +5,8 @@ void SPIDeviceManager::begin(int sckPin, int misoPin, int mosiPin, int csPin, ui
     SPI.begin(sckPin, misoPin, mosiPin, csPin);
     SPI.setFrequency(clockSpeed);
     Serial.println("SPI Bus initialized");
+    pinMode(csPin, OUTPUT);
+    digitalWrite(csPin, HIGH);
 }
 
 uint8_t SPIDeviceManager::readRegister(int csPin, uint8_t reg) {

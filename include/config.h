@@ -2,8 +2,8 @@
 #define CONFIG_H
 
 // Enable/disable sensors
-#define USE_MPU6050   1
-#define USE_MPU6500   0
+#define USE_MPU6050   0
+#define USE_MPU6500   1
 #define USE_BME280    0
 #define USE_QMC5883L  0
 
