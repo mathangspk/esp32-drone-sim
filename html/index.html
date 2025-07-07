@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ESP32 Sensor Dashboard</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f0f2f5;
+      padding: 20px;
+      color: #333;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+      color: #2c3e50;
+    }
+
+    .button-group {
+      margin-bottom: 10px;
+    }
+
+    button {
+      padding: 10px 16px;
+      margin: 5px;
+      font-size: 14px;
+      border: none;
+      background-color: #3498db;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    #log {
+      background-color: #ffffff;
+      border: 1px solid #ccc;
+      padding: 10px;
+      height: 400px;
+      overflow-y: scroll;
+      font-family: monospace;
+      white-space: pre;
+      border-radius: 4px;
+      box-shadow: inset 0 0 5px #ddd;
+    }
+    
+  </style>
+</head>
+<body>
+  <h2>ESP32 Sensor Logger</h2>
+
+  <div class="button-group">
+    <button onclick="connectWS()">🔌 Connect</button>
+    <button onclick="disconnectWS()">❌ Disconnect</button>
+    <button onclick="startLogging()">⏺️ Start Logging</button>
+    <button onclick="stopLogging()">⏹️ Stop Logging</button>
+    <button onclick="downloadCSV()">📥 Download CSV</button>
+  </div>
+<div id="stats" style="margin-top: 10px; font-family: monospace; background: #fff; border: 1px solid #ccc; padding: 10px; border-radius: 4px;">
+  <strong>Timestamp Gap Stats:</strong><br>
+  Min: <span id="gapMin">-</span> ms |
+  Max: <span id="gapMax">-</span> ms |
+  Avg: <span id="gapAvg">-</span> ms
+</div>
+  <div id="log"></div>
+
+  <script>
+    let ws = null;
+    let logging = false;
+    let csvData = "Time (ms),Roll,Pitch,Yaw,GyroX,GyroY,GyroZ,Throttle,RC_Roll,RC_Pitch,RC_Yaw,Aux1,Aux2\n";
+    let lastTimestamp = null;
+    const recentSamples = [];
+
+    function log(msg) {
+      const logDiv = document.getElementById("log");
+      recentSamples.push(msg);
+      if (recentSamples.length > 1000) {
+        recentSamples.shift();
+      }
+      logDiv.textContent = recentSamples.join('\n');
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function connectWS() {
+      if (ws) ws.close();
+      ws = new WebSocket(`ws://localhost:8180/ws`);
+      ws.onopen = () => log("[INFO] WebSocket connected");
+      ws.onclose = () => log("[INFO] WebSocket disconnected");
+      ws.onerror = err => log("[ERROR] WebSocket: " + err.message);
+
+      ws.onmessage = event => {
+        const json = JSON.parse(event.data);
+        if (json.type === "batch") {
+          json.data.forEach(sample => {
+            const [ts, roll, pitch, yaw, gx, gy, gz, thr, r_roll, r_pitch, r_yaw, aux1, aux2] = sample;
+            if (lastTimestamp) {
+            const gap = ts - lastTimestamp;
+            if (gap > 15) {
+                log(`[⚠️ GAP] Timestamp gap: ${gap}ms`);
+            }
+            updateGapStats(gap);
+            }
+            // Warn if time gap is abnormal
+            if (lastTimestamp && ts - lastTimestamp > 15) {
+              log(`[⚠️ GAP] Timestamp gap: ${ts - lastTimestamp}ms`);
+            }
+            lastTimestamp = ts;
+
+            const line = `⏱ ${ts}ms | IMU: R=${roll.toFixed(1)} P=${pitch.toFixed(1)} Y=${yaw.toFixed(1)} | G=(${gx.toFixed(1)}, ${gy.toFixed(1)}, ${gz.toFixed(1)}) | RC: Th=${thr} R=${r_roll} P=${r_pitch} Y=${r_yaw} Aux=${aux1}/${aux2}`;
+            log(line);
+
+            if (logging) {
+              csvData += `${ts},${roll},${pitch},${yaw},${gx},${gy},${gz},${thr},${r_roll},${r_pitch},${r_yaw},${aux1},${aux2}\n`;
+            }
+          });
+        }
+      };
+    }
+
+    function disconnectWS() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    }
+
+    function startLogging() {
+      logging = true;
+      csvData = "Time (ms),Roll,Pitch,Yaw,GyroX,GyroY,GyroZ,Throttle,RC_Roll,RC_Pitch,RC_Yaw,Aux1,Aux2\n";
+      log("[INFO] Logging started.");
+    }
+
+    function stopLogging() {
+      logging = false;
+      log("[INFO] Logging stopped.");
+    }
+
+    function downloadCSV() {
+      const blob = new Blob([csvData], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "sensor_log.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      log("[INFO] CSV downloaded.");
+    }
+
+    let gapMin = Infinity;
+    let gapMax = 0;
+    let gapSum = 0;
+    let gapCount = 0;
+
+    function updateGapStats(gap) {
+    gapMin = Math.min(gapMin, gap);
+    gapMax = Math.max(gapMax, gap);
+    gapSum += gap;
+    gapCount++;
+
+    document.getElementById("gapMin").textContent = gapMin.toFixed(1);
+    document.getElementById("gapMax").textContent = gapMax.toFixed(1);
+    document.getElementById("gapAvg").textContent = (gapSum / gapCount).toFixed(1);
+    }
+
+
+    window.addEventListener("beforeunload", () => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    });
+  </script>
+</body>
+</html>
