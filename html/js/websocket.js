@@ -3,16 +3,16 @@ let ws = null;
 
 function connectWS() {
   if (ws) ws.close();
-  ws = new WebSocket(`ws://localhost:8180/ws`);
-  
+  ws = new WebSocket(`ws://192.168.4.1/ws`);
+
   ws.onopen = () => {
     log("[INFO] WebSocket connected");
   };
-  
+
   ws.onclose = () => {
     log("[INFO] WebSocket disconnected");
   };
-  
+
   ws.onerror = err => {
     log("[ERROR] WebSocket: " + err.message);
   };
