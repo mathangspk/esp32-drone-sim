@@ -47,7 +47,38 @@ bool SensorManager::initAll() {
     allSuccess &= initSensor("BME280 (I2C)", bme.init());
 #endif
 #if USE_QMC5883L
-    allSuccess &= initSensor("QMC5883L (I2C)", compass.init());
+    // Quét I2C để kiểm tra địa chỉ compass khi khởi động
+    static bool compassChecked = false;
+    if (!compassChecked) {
+        uint8_t foundAddress = 0;
+        for (uint8_t addr = 1; addr < 127; ++addr) {
+            Wire.beginTransmission(addr);
+            if (Wire.endTransmission() == 0) {
+                Serial.printf("[I2C] Found device at 0x%02X\n", addr);
+                if (addr == 0x0D || addr == 0x1E) {
+                    foundAddress = addr;
+                }
+            }
+        }
+        if (foundAddress) {
+            Serial.printf("[I2C] QMC5883L likely found at 0x%02X\n", foundAddress);
+        } else {
+            Serial.println("[I2C] QMC5883L NOT FOUND!");
+        }
+        if (!compass.begin()) {
+            Serial.println("[ERROR] QMC5883L begin failed!");
+        } else {
+            Serial.println("[INFO] QMC5883L begin OK!");
+        }
+        compassChecked = true;
+    }
+    static unsigned long lastCompassRead = 0;
+    unsigned long now = millis();
+    static float mx = 0, my = 0, mz = 0;
+    if (now - lastCompassRead > 30) { // tăng lên 30ms
+        compass.readMag(mx, my, mz);
+        lastCompassRead = now;
+    }
 #endif
     
     // Setup filters (Betaflight style)
@@ -74,28 +105,57 @@ void SensorManager::readAll() {
     bme.read();
 #endif
 #if USE_QMC5883L
-    compass.read();
+    static unsigned long lastCompassRead = 0;
+    unsigned long now = millis();
+    static float mx = 0, my = 0, mz = 0;
+    if (now - lastCompassRead > 30) { // tăng lên 30ms
+        compass.readMag(mx, my, mz);
+        lastCompassRead = now;
+    }
+#endif
+
+    // --- Bổ sung xử lý heading gốc cho yaw ---
+    static bool yawZeroed = false;
+    static float yawOffset = 0.0f;
+    float heading = compass.getHeading(); // đơn vị độ
+    if (!yawZeroed) {
+        yawOffset = heading;
+        yawZeroed = true;
+        attitude.setYaw(0.0f);
+    }
+    // Chuyển heading và yawOffset sang radian trước khi tính hiệu
+    float headingRad = heading * M_PI / 180.0f;
+    float yawOffsetRad = yawOffset * M_PI / 180.0f;
+    float magYaw = headingRad - yawOffsetRad;
+    // Chuẩn hóa magYaw về [-pi, pi]
+    while (magYaw > M_PI) magYaw -= 2 * M_PI;
+    while (magYaw < -M_PI) magYaw += 2 * M_PI;
+    // Debug giá trị thực tế
+    Serial.printf("heading: %.2f, yawOffset: %.2f, magYaw: %.2f, yaw: %.2f\n", heading, yawOffset, magYaw, attitude.getYaw());
+
+#if USE_QMC5883L
+    //Serial.printf("compass X: %.2f, Y: %.2f, Z: %.2f\n", mx, my, mz);
 #endif
 
 #if USE_MPU6050
-    // Lấy dữ liệu trực tiếp từ mpu6050
     attitude.update(
         mpu6050.getGyroX() * M_PI / 180.0f,
         mpu6050.getGyroY() * M_PI / 180.0f,
         mpu6050.getGyroZ() * M_PI / 180.0f,
         mpu6050.getAccelX(),
         mpu6050.getAccelY(),
-        mpu6050.getAccelZ()
+        mpu6050.getAccelZ(),
+        magYaw
     );
 #elif USE_MPU6500
-    // Lấy dữ liệu trực tiếp từ mpu6500
     attitude.update(
         mpu6500.getGyroX() * M_PI / 180.0f,
         mpu6500.getGyroY() * M_PI / 180.0f,
         mpu6500.getGyroZ() * M_PI / 180.0f,
         mpu6500.getAccelX(),
         mpu6500.getAccelY(),
-        mpu6500.getAccelZ()
+        mpu6500.getAccelZ(),
+        magYaw
     );
 #endif
 }

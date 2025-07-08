@@ -39,9 +39,9 @@ void sensorTask(void *pvParameters) {
         data.roll_deg = att.getRoll() * 180.0f / M_PI;
         data.pitch_deg = att.getPitch() * 180.0f / M_PI;
         data.yaw_deg = att.getYaw() * 180.0f / M_PI;
-        data.gyroX_dps = data.mpu6050.getGyroX();
-        data.gyroY_dps = data.mpu6050.getGyroY();
-        data.gyroZ_dps = data.mpu6050.getGyroZ();
+        data.gyroX_dps = data.mpu6500.getGyroX();
+        data.gyroY_dps = data.mpu6500.getGyroY();
+        data.gyroZ_dps = data.mpu6500.getGyroZ();
         data.throttle = receiver.get_throttle();
         data.roll     = receiver.get_roll();
         data.pitch    = receiver.get_pitch();

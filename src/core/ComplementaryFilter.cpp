@@ -8,11 +8,12 @@ void ComplementaryFilter::setup(float alpha_, float dt_) {
     dt = dt_;
 }
 
-void ComplementaryFilter::update(float gx, float gy, float gz, float ax, float ay, float az) {
+void ComplementaryFilter::update(float gx, float gy, float gz, float ax, float ay, float az, float magYaw) {
+    if (isnan(yaw)) yaw = 0.0f;
+    if (isnan(magYaw)) magYaw = 0.0f;
     // Gyro integration (radians)
     roll  += gx * dt;
     pitch += gy * dt;
-    yaw   += gz * dt;
 
     // Accel angle (radians)
     float rollAcc  = atan2f(ay, az);
@@ -21,5 +22,5 @@ void ComplementaryFilter::update(float gx, float gy, float gz, float ax, float a
     // Complementary filter
     roll  = alpha * roll  + (1.0f - alpha) * rollAcc;
     pitch = alpha * pitch + (1.0f - alpha) * pitchAcc;
-    // Yaw không dùng accel (cần mag hoặc gyro drift compensation)
+    yaw   = alpha * (yaw + gz * dt) + (1.0f - alpha) * magYaw;
 } 

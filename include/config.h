@@ -5,7 +5,7 @@
 #define USE_MPU6050   0
 #define USE_MPU6500   1
 #define USE_BME280    0
-#define USE_QMC5883L  0
+#define USE_QMC5883L  1
 
 // Select interface for sensors that support multiple
 #define MPU6500_USE_SPI   1

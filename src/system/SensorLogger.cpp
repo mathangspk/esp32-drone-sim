@@ -68,10 +68,12 @@ void SensorLogger::logAllSensors(
         #endif
 
         #if USE_QMC5883L
+        float mx, my, mz;
+        const_cast<QMC5883L&>(compass).readMag(mx, my, mz);
         serial.print(",\"compass\":{");
-        serial.print("\"x\":"); serial.print(compass.getX()); serial.print(",");
-        serial.print("\"y\":"); serial.print(compass.getY()); serial.print(",");
-        serial.print("\"z\":"); serial.print(compass.getZ());
+        serial.print("\"x\":"); serial.print(mx); serial.print(",");
+        serial.print("\"y\":"); serial.print(my); serial.print(",");
+        serial.print("\"z\":"); serial.print(mz);
         serial.print("}");
         #endif
 

@@ -13,6 +13,7 @@ struct SensorData {
     QMC5883L compass;
     float roll_deg, pitch_deg, yaw_deg;
     float gyroX_dps, gyroY_dps, gyroZ_dps;
+    // float heading_deg; // (nếu muốn lưu heading từ compass)
     uint16_t throttle, roll, pitch, yaw, aux1, aux2;
 
     unsigned long timestamp_ms;
