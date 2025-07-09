@@ -16,7 +16,7 @@ void SensorLogger::logAllSensors(
     const BME280& bme,
     #endif
     #if USE_QMC5883L
-    const QMC5883L& compass,
+    const QMC5883LCompass& compass,
     #endif
     float roll_deg, float pitch_deg, float yaw_deg,
     float gyroX_dps, float gyroY_dps, float gyroZ_dps,
@@ -68,8 +68,10 @@ void SensorLogger::logAllSensors(
         #endif
 
         #if USE_QMC5883L
-        float mx, my, mz;
-        const_cast<QMC5883L&>(compass).readMag(mx, my, mz);
+        QMC5883LCompass& nonConstCompass = const_cast<QMC5883LCompass&>(compass);
+        float mx = nonConstCompass.getX();
+        float my = nonConstCompass.getY();
+        float mz = nonConstCompass.getZ();
         serial.print(",\"compass\":{");
         serial.print("\"x\":"); serial.print(mx); serial.print(",");
         serial.print("\"y\":"); serial.print(my); serial.print(",");

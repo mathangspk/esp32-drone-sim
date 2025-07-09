@@ -3,6 +3,8 @@
 #include <math.h>
 #include "sensors/I2CDeviceManager.h"
 #include "sensors/SPIDeviceManager.h"
+#include <QMC5883LCompass.h>
+extern QMC5883LCompass compass;
 
 // Example: Biquad filters for gyro data
 static BiquadLPF gyroXFilter, gyroYFilter, gyroZFilter;
@@ -65,18 +67,19 @@ bool SensorManager::initAll() {
         } else {
             Serial.println("[I2C] QMC5883L NOT FOUND!");
         }
-        if (!compass.begin()) {
-            Serial.println("[ERROR] QMC5883L begin failed!");
-        } else {
-            Serial.println("[INFO] QMC5883L begin OK!");
-        }
+        
+        compass.init();
+        Serial.println("[INFO] QMC5883L init OK!");
         compassChecked = true;
     }
     static unsigned long lastCompassRead = 0;
     unsigned long now = millis();
     static float mx = 0, my = 0, mz = 0;
     if (now - lastCompassRead > 30) { // tăng lên 30ms
-        compass.readMag(mx, my, mz);
+        compass.read();
+        mx = compass.getX();
+        my = compass.getY();
+        mz = compass.getZ();
         lastCompassRead = now;
     }
 #endif
@@ -95,6 +98,7 @@ bool SensorManager::initAll() {
 }
 
 void SensorManager::readAll() {
+
 #if USE_MPU6050
     mpu6050.read();
 #endif
@@ -105,36 +109,21 @@ void SensorManager::readAll() {
     bme.read();
 #endif
 #if USE_QMC5883L
-    static unsigned long lastCompassRead = 0;
-    unsigned long now = millis();
-    static float mx = 0, my = 0, mz = 0;
-    if (now - lastCompassRead > 30) { // tăng lên 30ms
-        compass.readMag(mx, my, mz);
-        lastCompassRead = now;
-    }
-#endif
-
-    // --- Bổ sung xử lý heading gốc cho yaw ---
+    compass.read();
+    int azimuth = compass.getAzimuth(); // heading thực tế
+    Serial.printf("heading: %d\n", azimuth);
     static bool yawZeroed = false;
     static float yawOffset = 0.0f;
-    float heading = compass.getHeading(); // đơn vị độ
     if (!yawZeroed) {
-        yawOffset = heading;
+        yawOffset = azimuth;
         yawZeroed = true;
         attitude.setYaw(0.0f);
     }
-    // Chuyển heading và yawOffset sang radian trước khi tính hiệu
-    float headingRad = heading * M_PI / 180.0f;
-    float yawOffsetRad = yawOffset * M_PI / 180.0f;
-    float magYaw = headingRad - yawOffsetRad;
-    // Chuẩn hóa magYaw về [-pi, pi]
+    float magYaw = (azimuth - yawOffset) * M_PI / 180.0f;
     while (magYaw > M_PI) magYaw -= 2 * M_PI;
     while (magYaw < -M_PI) magYaw += 2 * M_PI;
     // Debug giá trị thực tế
-    Serial.printf("heading: %.2f, yawOffset: %.2f, magYaw: %.2f, yaw: %.2f\n", heading, yawOffset, magYaw, attitude.getYaw());
-
-#if USE_QMC5883L
-    //Serial.printf("compass X: %.2f, Y: %.2f, Z: %.2f\n", mx, my, mz);
+    Serial.printf("magYaw: %.2f, yaw: %.2f\n", magYaw, attitude.getYaw());
 #endif
 
 #if USE_MPU6050

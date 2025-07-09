@@ -7,6 +7,7 @@
 #include "network/httpServer.h"
 #include "network/websocketServer.h"
 #include "receiver/IBusReceiver.h"
+#include <QMC5883LCompass.h>
 
 volatile bool debugMode = false;
 
@@ -24,17 +25,32 @@ QueueHandle_t sensorDataQueue;
 #define WIFI_PASSWORD ""
 #define WIFI_CHANNEL 6
 
+QMC5883LCompass compass;
+
 void sensorTask(void *pvParameters) {
     SensorManager* sensorManager = (SensorManager*)pvParameters;
     SensorData data;
+    static bool wasAux2High = false;
     while (1) {
         
         receiver.read_channel_data();
+        int aux2 = receiver.get_aux2();
+
+        
+        // Lấy giá trị aux2 từ receiver (giả sử có hàm get_aux2 hoặc biến aux2 toàn cục)
+        
+    #if USE_QMC5883L
+        // Đã xóa hiệu chuẩn tự động khi AUX2=2000, chỉ dùng setCalibration trong setup
+        if (aux2 == 2000) {
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+            continue;
+        }
+    #endif
+
         sensorManager->readAll();
         data.mpu6050 = sensorManager->getMPU6050();
         data.mpu6500 = sensorManager->getMPU6500();
         data.bme280 = sensorManager->getBME280();
-        data.compass = sensorManager->getQMC5883L();
         const auto& att = sensorManager->getAttitude();
         data.roll_deg = att.getRoll() * 180.0f / M_PI;
         data.pitch_deg = att.getPitch() * 180.0f / M_PI;
@@ -138,6 +154,8 @@ void setup() {
 
     receiver.begin();
 
+    compass.init();
+    compass.setCalibration(-1482, 1507, -1477, 1290, -1646, 615); // Giá trị bạn đã hiệu chuẩn tốt
 
     Serial.printf("[Sensors] Free heap: %u\n", ESP.getFreeHeap());
 

@@ -4,9 +4,9 @@
 #include "sensors/MPU6050.h"
 #include "sensors/MPU6500.h"
 #include "sensors/BME280.h"
-#include "sensors/QMC5883L.h"
 #include "system/SerialCommandHandler.h"
 #include "config.h"
+#include "QMC5883LCompass.h"
 
 class SensorLogger {
 public:
@@ -23,7 +23,7 @@ public:
         const BME280& bme,
         #endif
         #if USE_QMC5883L
-        const QMC5883L& compass,
+        const QMC5883LCompass& compass,
         #endif
         float roll_deg, float pitch_deg, float yaw_deg,
         float gyroX_dps, float gyroY_dps, float gyroZ_dps,
